@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nota Bene - Login</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300..700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="background-image"></div>
+
+    <main class="main-container">
+        <section class="static-text">
+            <h1>Welcome to Nota Bene</h1>
+            <p>A Place for Your Notes</p>
+        </section>
+
+        <section class="form-section">
+            <!-- Buttons to Trigger Forms -->
+            <div class="form-buttons">
+                <button onclick="showLogin()">Login</button>
+                <button onclick="showSignUp()">Sign Up</button>
+                <p id="error-message"></p>
+            </div>
+
+            <!-- Login Form (Hidden by default) -->
+            <form id="login-form" class="form hidden" action="/auth/login" method="POST">
+                <h2>Login</h2>
+                <label for="login-email-username">Email or Username</label>
+                <input type="text" id="login-email-username" name="emailOrUsername" placeholder="Enter your email or username" required autocomplete="username">
+
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+                <button type="submit" class="submit-btn">Login</button>
+
+                <p class="forgot-pass">
+                    <a href="#" onclick="showForgotPassword()">Forgot password?</a>
+                </p>
+
+                <!-- Form Switch Links -->
+                <div class="form-switch">
+                    <p id="switch-to-signup">
+                        New here? <a href="#" onclick="showSignUp()">Create Account</a>
+                    </p>
+                    <p id="switch-to-login" class="hidden">
+                        Already have an account? <a href="#" onclick="showLogin()">Login</a>
+                    </p>
+                </div>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signup-form" class="form hidden" action="/auth/signup" method="POST">
+                <h2>Create Account</h2>
+
+                <label for="signup-username">Username</label>
+                <input type="text" id="signup-username" name="username" placeholder="Enter your username" required autocomplete="username">
+
+                <label for="signup-email">Email</label>
+                <input type="email" id="signup-email" name="email" placeholder="Enter your email" required autocomplete="email">
+
+                <label for="signup-password">Password</label>
+                <input type="password" id="signup-password" name="password" placeholder="Enter your password" required autocomplete="new-password">
+
+                <!-- Password Strength Meter -->
+                <div id="password-strength-meter">
+                    <div id="strength-bar"></div>
+                </div>
+                <p id="password-strength-text">Password Strength: Weak</p>
+
+                <label for="signup-confirm-password">Confirm Password</label>
+                <input type="password" id="signup-confirm-password" name="confirmPassword" placeholder="Confirm your password" required autocomplete="new-password">
+
+                <!-- Password Match Error -->
+                <p id="password-match-error" style="color: red; display: none;">Passwords do not match</p>
+
+                <button type="submit" class="submit-btn">Sign Up</button>
+            </form>
+
+            <!-- Forgot Password Form (Hidden by default) -->
+            <form id="forgot-password-form" class="form hidden" action="/auth/forgot-password" method="POST">
+                <h2>Reset Password</h2>
+                <label for="forgot-email">Email</label>
+                <input type="email" id="forgot-email" name="email" placeholder="Enter your email" required autocomplete="email">
+                <button type="submit" class="submit-btn">Reset Password</button>
+            </form>
+
+            
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
