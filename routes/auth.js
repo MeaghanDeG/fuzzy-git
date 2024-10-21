@@ -1,7 +1,8 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const User = require('../models/User'); // User schema
 const router = express.Router();
+const User = require('../models/User'); // User schema
+const sendEmail = require('../utils/email');
 
 
 // Signup Route
@@ -10,38 +11,44 @@ router.post('/signup', async (req, res) => {
     const { username, email, password, confirmPassword } = req.body;
 
     if (password !== confirmPassword) {
-        return res.status(400).json({ message: 'Passwords do not match' });
+        return res.status(400).json({ success: false, message: 'Passwords do not match' });
     }
 
     try {
         // Check if user already exists
-        const existingUser = await User.findOne({ email });
+        const existingUser = await User.findOne({
+            $or: [{ email }, { username }]
+        });
         if (existingUser) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({ success: false, message: 'User already exists' });
         }
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Save the new user with the hashed password
+        // Create a new user instance without hashing the password here
         const newUser = new User({
             username,
             email,
-            password: hashedPassword  // Make sure to save the hashed password
+            password // Plain text password; will be hashed in the pre-save hook
         });
 
         await newUser.save();
-        res.status(201).json({ message: 'User registered successfully' });
+        res.status(201).json({ success: true, message: 'User registered successfully' });
+
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server error' });
+
+        // Handle duplicate key error (e.g., email already exists)
+        if (err.code === 11000) {
+            return res.status(400).json({ success: false, message: 'User already exists' });
+        }
+
+        // Handle other errors (validation, etc.)
+        res.status(500).json({ success: false, message: 'Server error. Please try again.' });
     }
 });
 
-
-
 // Login Route
 router.post('/login', async (req, res) => {
+    console.log('Login route hit');
     const { emailOrUsername, password } = req.body;
 
     try {
@@ -51,54 +58,112 @@ router.post('/login', async (req, res) => {
         });
 
         if (!user) {
-            return res.status(400).json({ message: 'User not found' });
+            console.log('User not found');
+            return res.status(400).json({ success: false, message: 'Invalid credentials' });
         }
 
-        // Compare the entered password with the stored hashed password
-        const isMatch = await bcrypt.compare(password, user.password);
+        // Use the comparePassword method from the User model
+        const isMatch = await user.comparePassword(password);
+
+        // Log for debugging
+        console.log('Entered password:', password);
+        console.log('Stored hashed password:', user.password);
+        console.log('Password match result:', isMatch);
 
         if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials' });
+            console.log('Password does not match');
+            return res.status(400).json({ success: false, message: 'Invalid credentials' });
         }
 
-        // Store user information in session
+        // Store user info in session and send success response
         req.session.user = user;
-        res.json({ message: 'Login successful' });
+        res.json({ success: true, message: 'Login successful' });
+
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 });
 
-
 // Forgot Password Route
-router.post('/auth/forgot-password', async (req, res) => {
+router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
 
     try {
+        // 1. Find the user by email
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(400).json({ message: 'User not found' });
+            return res.status(400).json({ success: false, message: 'There is no user with that email.' });
         }
 
-        // Logic for sending a password reset email/token
+        // 2. Generate reset token
+        const resetToken = user.createPasswordResetToken();
+        await user.save({ validateBeforeSave: false });
 
-        res.json({ message: 'Password reset link sent to email' });
+        // 3. Send the reset token via email
+        const resetURL = `http://localhost:3000/reset-password/${resetToken}`;
+        const message = `Forgot your password? Reset it by clicking the link: ${resetURL}`;
+
+        try {
+            await sendEmail({
+                email: user.email,
+                subject: 'Your password reset token (valid for 1 hour)',
+                message
+            });
+
+            // For development, log the reset URL
+            console.log('Password reset link:', resetURL);
+
+            res.json({ success: true, message: 'Token sent to email!' });
+        } catch (err) {
+            console.error('Error sending email:', err);
+            user.resetPasswordToken = undefined;
+            user.resetPasswordExpires = undefined;
+            await user.save({ validateBeforeSave: false });
+
+            res.status(500).json({ success: false, message: 'There was an error sending the email. Try again later.' });
+        }
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ success: false, message: 'Server error. Please try again.' });
     }
 });
 
-// Logout Route
+// Reset Password Route
+router.post('/reset-password/:token', async (req, res) => {
+    const { token } = req.params;
+    const { password, confirmPassword } = req.body;
 
-router.get('/auth/logout', (req, res) => {
-    req.session.destroy((err) => {
-        if (err) {
-            return res.status(500).json({ message: 'Logout failed' });
+    if (password !== confirmPassword) {
+        return res.status(400).json({ success: false, message: 'Passwords do not match' });
+    }
+
+    try {
+        // Hash the token and find the user
+        const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+        const user = await User.findOne({
+            resetPasswordToken: hashedToken,
+            resetPasswordExpires: { $gt: Date.now() } // Check if token has not expired
+        });
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'Token is invalid or has expired' });
         }
-        res.json({ message: 'Logout successful' });
-    });
+
+        // Set the new password
+        user.password = password;
+        user.resetPasswordToken = undefined;
+        user.resetPasswordExpires = undefined;
+
+        await user.save();
+
+        res.json({ success: true, message: 'Password has been reset successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+    }
 });
+
 
 module.exports = router;

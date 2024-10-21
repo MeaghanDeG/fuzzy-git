@@ -1,53 +1,62 @@
+// Load environment variables from .env file
+require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
-const dotenv = require('dotenv');
 const path = require('path');
-const User = require('./models/User'); // Assuming you have a User model in models/User.js
-const authRoutes = require('./routes/auth'); // Import the auth routes
 const cors = require('cors');
-
-dotenv.config();
 
 const app = express();
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.log(err));
+// Import your auth routes
+const authRoutes = require('./routes/auth');
 
-// Use the auth routes
+// CORS configuration to allow requests from your frontend
 app.use(cors({
-    origin: 'http://127.0.0.1:3001',
-    methods: ['GET', 'POST'],
+    origin: ['http://127.0.0.1:3000', 'http://localhost:3000'], // Allow both localhost and 127.0.0.1
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true, // Allow credentials (cookies, sessions)
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true 
 }));
 
-// Middleware
-app.use(express.json());
+// Handle preflight requests
+app.options('*', cors());
 
-    // Middleware to parse URL-encoded form data
+// Middleware to parse incoming JSON requests
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware for handling user sessions
+// Session management
 app.use(session({
-    secret: process.env.SECRET_KEY,
+    secret: process.env.SECRET_KEY, // Load from .env
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }  // Set secure to true if using HTTPS
+    cookie: {
+        secure: false, // Set to true if using HTTPS
+        httpOnly: true, // Helps prevent cross-site scripting attacks
+    }
 }));
 
-// Serve static files from the "public" directory
+// MongoDB connection
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.log('MongoDB connection error:', err));
+
+// Serve static files (e.g., your HTML, CSS, JS)
 app.use(express.static(path.join(__dirname, 'public')));
 
-
+// Use authentication routes
 app.use('/auth', authRoutes);
- 
 
-// Default route for homepage
+// Serve the index.html file as a homepage (if needed)
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+// Test route to verify the server is working
+app.get('/test', (req, res) => {
+    res.send('Server is working!');
 });
 
 // Start the server

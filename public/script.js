@@ -63,78 +63,67 @@ document.addEventListener('DOMContentLoaded', function () {
         errorMessageDisplay.textContent = '';  // Clear any error messages
     };
 
-    // Signup Form Submission
-    signupForm.addEventListener('submit', function (event) {
-        event.preventDefault(); // Prevent form submission
+   // Handle signup form submission
+document.getElementById('signup-form').addEventListener('submit', function (e) {
+    e.preventDefault();
 
-        const username = document.getElementById('signup-username').value;
-        const email = document.getElementById('signup-email').value;
-        const password = passwordInput.value;
-        const confirmPassword = confirmPasswordInput.value;
+    const username = document.getElementById('signup-username').value;
+    const email = document.getElementById('signup-email').value;
+    const password = document.getElementById('signup-password').value;
+    const confirmPassword = document.getElementById('signup-confirm-password').value;
 
-        if (password !== confirmPassword) {
-            passwordMatchError.style.display = 'block';
-            return;
-        } else {
-            passwordMatchError.style.display = 'none';
-        }
-
-        const data = {
-            username,
-            email,
-            password
-        };
-
-        fetch('http://127.0.0.1:3001/auth/signup', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data),
-            credentials: 'include'
-        })
+    fetch('http://localhost:3001/auth/signup', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include', // Include credentials in cross-origin requests
+        body: JSON.stringify({ username, email, password, confirmPassword })
+    })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                displaySuccess('Registration successful! Please log in.');
-                showLogin();
+                alert('Signup successful!');
+                // Redirect or update UI accordingly
             } else {
-                displayError(data.message || 'An error occurred. Please try again.');
+                alert(data.message || 'Signup failed.');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            displayError('An error occurred. Please try again.');
+            alert('An error occurred. Please try again.');
         });
-    });
+});
 
-    // Login Form Submission
-    loginForm.addEventListener('submit', function (event) {
-        event.preventDefault();
+// Handle login form submission
+document.getElementById('login-form').addEventListener('submit', function (e) {
+    e.preventDefault();
 
-        const emailOrUsername = document.getElementById('login-email-username').value;
-        const password = document.getElementById('login-password').value;
+    const emailOrUsername = document.getElementById('login-email-or-username').value;
+    const password = document.getElementById('login-password').value;
 
-        fetch('http://127.0.0.1:3001/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ emailOrUsername, password })
-        })
+    fetch('http://localhost:3001/auth/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        credentials: 'include', // Include credentials in cross-origin requests
+        body: JSON.stringify({ emailOrUsername, password })
+    })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Login successful!'); // Optionally replace this with a redirect or a better user experience
+                alert('Login successful!');
+                // Redirect or update UI accordingly
             } else {
-                displayError(data.message || 'Invalid credentials.');
+                alert(data.message || 'Invalid credentials.');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            displayError('An error occurred. Please try again.');
+            alert('An error occurred. Please try again.');
         });
-    });
+});
 
     // Realtime password matching validation
     confirmPasswordInput.addEventListener('input', function () {

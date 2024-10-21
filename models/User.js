@@ -1,40 +1,37 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto'); // Import the crypto module
+// const validator = require('validator'); // Uncomment if using validator
 
-// Define the User schema
 const userSchema = new mongoose.Schema({
-    username: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true,
-    },
+    username: { type: String, unique: true },
     email: {
         type: String,
-        required: true,
         unique: true,
+        required: true,
         lowercase: true,
-        trim: true,
+        // validate: [validator.isEmail, 'Please provide a valid email'] // Uncomment if using validator
     },
     password: {
         type: String,
         required: true,
+        minlength: 8 // Adjust as needed
     },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
+    resetPasswordToken: String,
+    resetPasswordExpires: Date,
+    createdAt: { type: Date, default: Date.now }
 });
 
-// Pre-save hook to hash the password before saving to the database
-userSchema.pre('save', async function(next) {
+// Pre-save hook to hash the password
+userSchema.pre('save', async function (next) {
     const user = this;
 
-    if (!user.isModified('password')) return next(); // Only hash if the password is new or modified
+    // Only hash the password if it has been modified (or is new)
+    if (!user.isModified('password')) return next();
 
     try {
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(user.password, salt); // Hash the password
+        // console.log('Pre-save hook: hashing password'); // Optional: Remove in production
+        user.password = await bcrypt.hash(user.password, 10);
         next();
     } catch (err) {
         next(err);
@@ -42,11 +39,28 @@ userSchema.pre('save', async function(next) {
 });
 
 // Method to compare password for login
-userSchema.methods.comparePassword = async function(enteredPassword) {
-    return await bcrypt.compare(enteredPassword, this.password); // Compare entered password with hashed password
+userSchema.methods.comparePassword = async function (enteredPassword) {
+    return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Custom validation to require at least one of `username` or `email` (if both are not required)
+userSchema.pre('validate', function (next) {
+    if (!this.username && !this.email) {
+        return next(new Error('Either username or email is required.'));
+    }
+    next();
+});
+
+// Method to generate password reset token
+userSchema.methods.createPasswordResetToken = function() {
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    // Hash the token and set to resetPasswordToken field
+    this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    // Set token expiration time (e.g., 1 hour)
+    this.resetPasswordExpires = Date.now() + 3600000; // 1 hour in milliseconds
+    return resetToken; // Return the plain token
 };
 
 // Export the model
 const User = mongoose.model('User', userSchema);
-
 module.exports = User;
