@@ -14,7 +14,7 @@ const authRoutes = require('./routes/auth');
 
 // CORS configuration to allow requests from your frontend
 app.use(cors({
-    origin: ['http://127.0.0.1:3000', 'http://localhost:3000'], // Allow both localhost and 127.0.0.1
+    origin: '*', // Allow both localhost and 127.0.0.1
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true, // Allow credentials (cookies, sessions)
     allowedHeaders: ['Content-Type', 'Authorization'],

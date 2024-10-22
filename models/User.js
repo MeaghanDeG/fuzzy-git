@@ -30,10 +30,11 @@ userSchema.pre('save', async function (next) {
     if (!user.isModified('password')) return next();
 
     try {
-        // console.log('Pre-save hook: hashing password'); // Optional: Remove in production
+        console.log('Presave hook:hashing password');
         user.password = await bcrypt.hash(user.password, 10);
         next();
     } catch (err) {
+        console.errror('Error in hashing',err);
         next(err);
     }
 });

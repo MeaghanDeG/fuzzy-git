@@ -1,9 +1,10 @@
 const express = require('express');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
-const router = express.Router();
-const User = require('../models/User'); // User schema
-const sendEmail = require('../utils/email');
 
+const User = require('../models/User'); // User schema
+
+const router = express.Router(); 
 
 // Signup Route
 router.post('/signup', async (req, res) => {
@@ -29,7 +30,7 @@ router.post('/signup', async (req, res) => {
             email,
             password // Plain text password; will be hashed in the pre-save hook
         });
-
+        
         await newUser.save();
         res.status(201).json({ success: true, message: 'User registered successfully' });
 
@@ -49,7 +50,9 @@ router.post('/signup', async (req, res) => {
 // Login Route
 router.post('/login', async (req, res) => {
     console.log('Login route hit');
-    const { emailOrUsername, password } = req.body;
+    let { emailOrUsername, password } = req.body;
+
+    emailOrUsername = emailOrUsername.trim().toLowerCase();
 
     try {
         // Find the user by email or username
@@ -64,6 +67,7 @@ router.post('/login', async (req, res) => {
 
         // Use the comparePassword method from the User model
         const isMatch = await user.comparePassword(password);
+        console.log('Password match result:', isMatch);
 
         // Log for debugging
         console.log('Entered password:', password);
@@ -75,9 +79,10 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid credentials' });
         }
 
-        // Store user info in session and send success response
-        req.session.user = user;
-        res.json({ success: true, message: 'Login successful' });
+       // Successful login
+       res.status(200).json({ success: true, message: 'Login successful' });
+
+
 
     } catch (err) {
         console.error(err);
@@ -85,85 +90,66 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Forgot Password Route
+
+
 router.post('/forgot-password', async (req, res) => {
     const { email } = req.body;
 
     try {
-        // 1. Find the user by email
         const user = await User.findOne({ email });
+
         if (!user) {
-            return res.status(400).json({ success: false, message: 'There is no user with that email.' });
+            return res.status(200).send('If that email is registered, you will receive a password reset link.');
         }
 
-        // 2. Generate reset token
-        const resetToken = user.createPasswordResetToken();
+        // Generate and hash token
+        const resetToken = crypto.randomBytes(20).toString('hex');
+        user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+        user.resetPasswordExpires = Date.now() + 3600000; // 1 hour expiration
+
         await user.save({ validateBeforeSave: false });
 
-        // 3. Send the reset token via email
-        const resetURL = `http://localhost:3000/reset-password/${resetToken}`;
-        const message = `Forgot your password? Reset it by clicking the link: ${resetURL}`;
+        // For now, console log the link for testing
+        console.log(`Password reset link: http://localhost:3001/reset-password/${resetToken}`);
 
-        try {
-            await sendEmail({
-                email: user.email,
-                subject: 'Your password reset token (valid for 1 hour)',
-                message
-            });
-
-            // For development, log the reset URL
-            console.log('Password reset link:', resetURL);
-
-            res.json({ success: true, message: 'Token sent to email!' });
-        } catch (err) {
-            console.error('Error sending email:', err);
-            user.resetPasswordToken = undefined;
-            user.resetPasswordExpires = undefined;
-            await user.save({ validateBeforeSave: false });
-
-            res.status(500).json({ success: false, message: 'There was an error sending the email. Try again later.' });
-        }
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+        res.status(200).send('If that email is registered, you will receive a password reset link.');
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error occurred');
     }
 });
 
-// Reset Password Route
+
+
 router.post('/reset-password/:token', async (req, res) => {
     const { token } = req.params;
-    const { password, confirmPassword } = req.body;
-
-    if (password !== confirmPassword) {
-        return res.status(400).json({ success: false, message: 'Passwords do not match' });
-    }
+    const { password } = req.body;
 
     try {
-        // Hash the token and find the user
+        // Hash the token to match what is stored in the database
         const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
+        // Find the user by hashed reset token and ensure the token is still valid
         const user = await User.findOne({
             resetPasswordToken: hashedToken,
-            resetPasswordExpires: { $gt: Date.now() } // Check if token has not expired
+            resetPasswordExpires: { $gt: Date.now() },
         });
 
         if (!user) {
-            return res.status(400).json({ success: false, message: 'Token is invalid or has expired' });
+            return res.status(400).send('Invalid or expired token');
         }
 
-        // Set the new password
-        user.password = password;
+        // Hash the new password before saving
+        user.password = await bcrypt.hash(password, 10);
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
 
         await user.save();
-
-        res.json({ success: true, message: 'Password has been reset successfully' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+        res.status(200).send('Password has been successfully reset');
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Error occurred');
     }
 });
-
 
 module.exports = router;
