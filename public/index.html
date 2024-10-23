@@ -27,7 +27,7 @@
             </div>
 
             <!-- Login Form (Hidden by default) -->
-            <form id="login-form" class="form hidden" action="/auth/login" method="POST">
+            <form id="login-form" action="/auth/login" method="POST">
                 <h2>Login</h2>
                 <label for="login-email-username">Email or Username</label>
                 <input type="text" id="login-email-username" name="emailOrUsername" placeholder="Enter your email or username" required autocomplete="username">
@@ -84,7 +84,22 @@
                 <h2>Reset Password</h2>
                 <label for="forgot-email">Email</label>
                 <input type="email" id="forgot-email" name="email" placeholder="Enter your email" required autocomplete="email">
-                <button type="submit" class="submit-btn">Reset Password</button>
+                <button type="button" id="forgot-password-button"class="submit-btn">Reset Password</button>
+            </form>
+
+            <!-- Password Reset Form (Hidden by default) -->
+            <form id="reset-password-form" class="form hidden" action="/auth/reset-password" method="POST">
+                <h2>Reset Password</h2>
+                <label for="reset-email">Email</label>
+                <input type="email" id="reset-email" name="email" placeholder="Enter your email" required readonly>
+
+                <label for="reset-password">New Password</label>
+                <input type="password" id="reset-password" name="password" placeholder="Enter your new password" required autocomplete="new-password">
+
+                <label for="reset-confirm-password">Confirm New Password</label>
+                <input type="password" id="reset-confirm-password" name="confirmPassword" placeholder="Confirm your new password" required autocomplete="new-password">
+
+                <button type="submit" id="reset-password-button" class="submit-btn">Reset Password</button>
             </form>
 
             

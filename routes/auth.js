@@ -90,65 +90,68 @@ router.post('/login', async (req, res) => {
     }
 });
 
-
-
 router.post('/forgot-password', async (req, res) => {
+    console.log('Forgot Password route hit'); // Add this line to verify route is hit
     const { email } = req.body;
 
     try {
         const user = await User.findOne({ email });
 
         if (!user) {
-            return res.status(200).send('If that email is registered, you will receive a password reset link.');
+            // Respond as if the email was found to avoid exposing which emails are registered
+            return res.status(200).json({ success: true, message: 'If that email is registered, you will receive a password reset link.' });
         }
-
-        // Generate and hash token
+        // Generate a reset token
         const resetToken = crypto.randomBytes(20).toString('hex');
+        
+        // Hash the reset token before saving to the database
         user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
         user.resetPasswordExpires = Date.now() + 3600000; // 1 hour expiration
 
+        // Save user without running validation checks on other fields
         await user.save({ validateBeforeSave: false });
 
-        // For now, console log the link for testing
-        console.log(`Password reset link: http://localhost:3001/reset-password/${resetToken}`);
+        // Log the reset link for testing purposes
+        console.log(`Password reset link: http://localhost:3000/reset-password/${resetToken}`);
 
-        res.status(200).send('If that email is registered, you will receive a password reset link.');
+        res.status(200).json({ success: true, message: 'If that email is registered, you will receive a password reset link.' });
     } catch (error) {
-        console.error(error);
-        res.status(500).send('Error occurred');
+        console.error('Error in forgot password route:', error);
+        res.status(500).json({ success: false, message: 'An error occurred while processing your request.' });
     }
 });
 
 
-
+// Reset Password Route
 router.post('/reset-password/:token', async (req, res) => {
     const { token } = req.params;
     const { password } = req.body;
 
     try {
-        // Hash the token to match what is stored in the database
+        // Hash the token to compare it to the stored hash
         const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
-        // Find the user by hashed reset token and ensure the token is still valid
+        // Find the user by the hashed reset token and ensure the token is still valid
         const user = await User.findOne({
             resetPasswordToken: hashedToken,
-            resetPasswordExpires: { $gt: Date.now() },
+            resetPasswordExpires: { $gt: Date.now() }, // Token should not be expired
         });
 
         if (!user) {
             return res.status(400).send('Invalid or expired token');
         }
 
-        // Hash the new password before saving
+        // Hash the new password and reset the token fields
         user.password = await bcrypt.hash(password, 10);
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
 
+        // Save the updated user with the new password
         await user.save();
         res.status(200).send('Password has been successfully reset');
     } catch (error) {
-        console.error(error);
-        res.status(500).send('Error occurred');
+        console.error('Error in reset password route:', error);
+        res.status(500).send('An error occurred while resetting your password.');
     }
 });
 
